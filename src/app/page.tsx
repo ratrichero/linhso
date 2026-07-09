@@ -8,6 +8,7 @@ import {
   HUNG_TINH,
   TU_TRUONG_SHORT,
   QUE_CAT,
+  getCarrierName,
 } from "@/lib/constants";
 import {
   generatePhoneNumbers,
@@ -15,6 +16,7 @@ import {
   type PhoneResult,
 } from "@/lib/coreEngine";
 import { analyzePhone } from "@/lib/phoneAnalysis";
+import { calculateIChing } from "@/lib/iching";
 import { getBlacklist, addToBlacklist } from "@/lib/blacklist";
 import { exportToCSV, formatPhoneDisplay } from "@/lib/exportCSV";
 
@@ -23,6 +25,7 @@ const ALL_MENH = ["Kim", "Mộc", "Thủy", "Hỏa", "Thổ"];
 
 type CarrierOption = "Tất cả" | "Viettel" | "Vinaphone" | "Mobifone" | "Custom";
 type QueChinhFilter = "all" | "cat";
+type ResultMode = "generate" | "lookup";
 
 export default function HomePage() {
   // --- State ---
@@ -36,12 +39,19 @@ export default function HomePage() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasCalculated, setHasCalculated] = useState(false);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+  const [resultMode, setResultMode] = useState<ResultMode>("generate");
+
+  // Lookup state
+  const [lookupInput, setLookupInput] = useState("");
+  const [isLookingUp, setIsLookingUp] = useState(false);
 
   // Filter state
   const [filterCarrier, setFilterCarrier] = useState<string>("all");
   const [filterMenh, setFilterMenh] = useState<string[]>([]);
   const [filterQueChinh, setFilterQueChinh] = useState<QueChinhFilter>("all");
   const [filterHungTinh, setFilterHungTinh] = useState<string[]>([]);
+  const [filterNoHungTinh, setFilterNoHungTinh] = useState(false);
 
   // --- Derived ---
   const prefixes = useMemo(() => {
@@ -82,8 +92,15 @@ export default function HomePage() {
       filtered = filtered.filter((r) => QUE_CAT.includes(r.iching.queChinh));
     }
 
+    // Filter by no hung tinh
+    if (filterNoHungTinh) {
+      filtered = filtered.filter((r) => {
+        const analysis = analyzePhone(r.phoneNumber);
+        return analysis.hungCount === 0;
+      });
+    }
     // Filter by hung tinh (must contain selected hung tinh types)
-    if (filterHungTinh.length > 0) {
+    else if (filterHungTinh.length > 0) {
       filtered = filtered.filter((r) => {
         const analysis = analyzePhone(r.phoneNumber);
         return filterHungTinh.some((ht) => analysis.hungTinhTypes.includes(ht));
@@ -91,7 +108,7 @@ export default function HomePage() {
     }
 
     return filtered;
-  }, [results, filterCarrier, filterMenh, filterQueChinh, filterHungTinh]);
+  }, [results, filterCarrier, filterMenh, filterQueChinh, filterHungTinh, filterNoHungTinh]);
 
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
   const paginatedResults = filteredResults.slice(
@@ -100,6 +117,23 @@ export default function HomePage() {
   );
 
   // --- Handlers ---
+  const copyToClipboard = async (phone: string) => {
+    try {
+      await navigator.clipboard.writeText(phone);
+      setCopiedPhone(phone);
+      setTimeout(() => setCopiedPhone(null), 1500);
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = phone;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      setCopiedPhone(phone);
+      setTimeout(() => setCopiedPhone(null), 1500);
+    }
+  };
+
   const toggleCustomPrefix = (prefix: string) => {
     setSelectedCustomPrefixes((prev) => {
       const newSet = new Set(prev);
@@ -154,14 +188,20 @@ export default function HomePage() {
     [activeSlot]
   );
 
-  const handleCalculate = useCallback(() => {
-    setIsCalculating(true);
-    setCurrentPage(1);
-    setHasCalculated(true);
+  const resetFilters = () => {
     setFilterCarrier("all");
     setFilterMenh([]);
     setFilterQueChinh("all");
     setFilterHungTinh([]);
+    setFilterNoHungTinh(false);
+  };
+
+  const handleCalculate = useCallback(() => {
+    setIsCalculating(true);
+    setCurrentPage(1);
+    setHasCalculated(true);
+    setResultMode("generate");
+    resetFilters();
 
     setTimeout(() => {
       try {
@@ -177,6 +217,48 @@ export default function HomePage() {
       }
     }, 50);
   }, [prefixes, conditions]);
+
+  const handleLookup = useCallback(() => {
+    const raw = lookupInput.trim();
+    if (!raw) return;
+
+    setIsLookingUp(true);
+    setCurrentPage(1);
+    setHasCalculated(true);
+    setResultMode("lookup");
+    resetFilters();
+
+    setTimeout(() => {
+      try {
+        // Parse phone numbers from input
+        const numbers = raw
+          .split(/[\n,\s]+/)
+          .map((s) => s.trim().replace(/\D/g, ""))
+          .filter((s) => s.length === 10);
+
+        if (numbers.length === 0) {
+          alert("Không tìm thấy số điện thoại hợp lệ (phải đúng 10 chữ số).");
+          setResults([]);
+          setIsLookingUp(false);
+          return;
+        }
+
+        // Calculate I-Ching for each number
+        const lookupResults: PhoneResult[] = numbers.map((phoneNumber) => ({
+          phoneNumber,
+          carrier: getCarrierName(phoneNumber),
+          iching: calculateIChing(phoneNumber),
+        }));
+
+        setResults(lookupResults);
+      } catch (err) {
+        console.error("Lookup error:", err);
+        setResults([]);
+      } finally {
+        setIsLookingUp(false);
+      }
+    }, 50);
+  }, [lookupInput]);
 
   const handleAddToBlacklist = useCallback((phone: string) => {
     addToBlacklist([phone]);
@@ -195,9 +277,16 @@ export default function HomePage() {
   };
 
   const toggleHungTinhFilter = (ht: string) => {
+    setFilterNoHungTinh(false);
     setFilterHungTinh((prev) =>
       prev.includes(ht) ? prev.filter((h) => h !== ht) : [...prev, ht]
     );
+    setCurrentPage(1);
+  };
+
+  const toggleNoHungTinhFilter = () => {
+    setFilterHungTinh([]);
+    setFilterNoHungTinh((prev) => !prev);
     setCurrentPage(1);
   };
 
@@ -481,13 +570,55 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* Lookup Section */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
+            <span className="text-lg">🔮</span>
+            <h2 className="text-sm sm:text-base font-bold text-slate-700">Tra cứu Quẻ</h2>
+          </div>
+          
+          <p className="text-[10px] sm:text-xs text-slate-500 mb-2">
+            Nhập số điện thoại cần tra (mỗi số 1 dòng, hoặc phân tách bằng dấu phẩy / dấu cách):
+          </p>
+          
+          <textarea
+            value={lookupInput}
+            onChange={(e) => setLookupInput(e.target.value)}
+            placeholder={"0931728725\n0982672558\n0359367268, 0981234567"}
+            className="w-full border border-slate-300 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-[80px] sm:min-h-[100px] resize-y mb-3"
+          />
+          
+          <button
+            onClick={handleLookup}
+            disabled={isLookingUp || !lookupInput.trim()}
+            className="w-full py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLookingUp ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Đang tra cứu...
+              </span>
+            ) : (
+              "🔮 TRA CỨU"
+            )}
+          </button>
+        </div>
+
         {/* Results */}
-        {hasCalculated && !isCalculating && (
+        {hasCalculated && !isCalculating && !isLookingUp && (
           <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
-              <h2 className="text-base sm:text-lg font-bold text-slate-800">
-                KẾT QUẢ ({filteredResults.length.toLocaleString()} / {results.length.toLocaleString()})
-              </h2>
+              <div>
+                <h2 className="text-base sm:text-lg font-bold text-slate-800">
+                  {resultMode === "lookup" ? "KẾT QUẢ TRA CỨU" : "KẾT QUẢ"} ({filteredResults.length.toLocaleString()} / {results.length.toLocaleString()})
+                </h2>
+                {resultMode === "lookup" && (
+                  <p className="text-[10px] sm:text-xs text-purple-600 mt-0.5">🔮 Tra cứu từ số điện thoại đã nhập</p>
+                )}
+              </div>
               {filteredResults.length > 0 && (
                 <button
                   onClick={handleExportCSV}
@@ -575,6 +706,17 @@ export default function HomePage() {
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <span className="text-[10px] sm:text-xs text-slate-500 w-16 sm:w-24 shrink-0">Hung Tinh:</span>
                   <div className="flex flex-wrap gap-1 sm:gap-2">
+                    {/* No Hung Tinh option */}
+                    <button
+                      onClick={toggleNoHungTinhFilter}
+                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                        filterNoHungTinh
+                          ? "bg-green-600 text-white ring-2 ring-green-300"
+                          : "bg-white border border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      ✨ Không có
+                    </button>
                     {HUNG_TINH.map((ht) => {
                       const isActive = filterHungTinh.includes(ht);
                       const short = TU_TRUONG_SHORT[ht];
@@ -593,9 +735,9 @@ export default function HomePage() {
                         </button>
                       );
                     })}
-                    {filterHungTinh.length > 0 && (
+                    {(filterHungTinh.length > 0 || filterNoHungTinh) && (
                       <button
-                        onClick={() => { setFilterHungTinh([]); setCurrentPage(1); }}
+                        onClick={() => { setFilterHungTinh([]); setFilterNoHungTinh(false); setCurrentPage(1); }}
                         className="text-[10px] sm:text-xs text-red-500 underline"
                       >
                         Xóa
@@ -643,17 +785,39 @@ export default function HomePage() {
               <>
                 {/* Mobile Card View */}
                 <div className="sm:hidden space-y-2">
-                  {paginatedResults.map((r, i) => {
+                  {paginatedResults.map((r) => {
                     const isQueCat = QUE_CAT.includes(r.iching.queChinh);
+                    const isCopied = copiedPhone === r.phoneNumber;
                     return (
                       <div
                         key={r.phoneNumber}
                         className="bg-slate-50 rounded-lg p-3 border border-slate-100"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono font-bold text-slate-800 text-base">
-                            {formatPhoneDisplay(r.phoneNumber)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-800 text-base">
+                              {formatPhoneDisplay(r.phoneNumber)}
+                            </span>
+                            <button
+                              onClick={() => copyToClipboard(r.phoneNumber)}
+                              className={`p-1 rounded transition-all ${
+                                isCopied 
+                                  ? "text-green-600 bg-green-100" 
+                                  : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                              }`}
+                              title="Copy số"
+                            >
+                              {isCopied ? (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
                           <button
                             onClick={() => handleAddToBlacklist(r.phoneNumber)}
                             className="text-red-400 hover:text-red-600 p-1"
@@ -707,6 +871,7 @@ export default function HomePage() {
                     <tbody>
                       {paginatedResults.map((r, i) => {
                         const isQueCat = QUE_CAT.includes(r.iching.queChinh);
+                        const isCopied = copiedPhone === r.phoneNumber;
                         return (
                           <tr
                             key={r.phoneNumber}
@@ -725,8 +890,31 @@ export default function HomePage() {
                                 {r.carrier}
                               </span>
                             </td>
-                            <td className="py-2 px-2 font-mono font-bold text-slate-800">
-                              {formatPhoneDisplay(r.phoneNumber)}
+                            <td className="py-2 px-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-slate-800">
+                                  {formatPhoneDisplay(r.phoneNumber)}
+                                </span>
+                                <button
+                                  onClick={() => copyToClipboard(r.phoneNumber)}
+                                  className={`p-1 rounded transition-all ${
+                                    isCopied 
+                                      ? "text-green-600 bg-green-100" 
+                                      : "text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                  }`}
+                                  title="Copy số"
+                                >
+                                  {isCopied ? (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                  )}
+                                </button>
+                              </div>
                             </td>
                             <td className="py-2 px-2">
                               <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
@@ -773,8 +961,8 @@ export default function HomePage() {
                     </button>
                     
                     {/* Show fewer pages on mobile */}
-                    {Array.from({ length: Math.min(totalPages, window?.innerWidth < 640 ? 5 : 10) }, (_, i) => {
-                      const maxPages = typeof window !== 'undefined' && window.innerWidth < 640 ? 5 : 10;
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      const maxPages = 5;
                       let pageNum: number;
                       if (totalPages <= maxPages) {
                         pageNum = i + 1;
