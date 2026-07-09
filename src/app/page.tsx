@@ -14,6 +14,7 @@ import {
   type Condition,
   type PhoneResult,
 } from "@/lib/coreEngine";
+import { analyzePhone } from "@/lib/phoneAnalysis";
 import { getBlacklist, addToBlacklist } from "@/lib/blacklist";
 import { exportToCSV, formatPhoneDisplay } from "@/lib/exportCSV";
 
@@ -40,6 +41,7 @@ export default function HomePage() {
   const [filterCarrier, setFilterCarrier] = useState<string>("all");
   const [filterMenh, setFilterMenh] = useState<string[]>([]);
   const [filterQueChinh, setFilterQueChinh] = useState<QueChinhFilter>("all");
+  const [filterHungTinh, setFilterHungTinh] = useState<string[]>([]);
 
   // --- Derived ---
   const prefixes = useMemo(() => {
@@ -80,8 +82,16 @@ export default function HomePage() {
       filtered = filtered.filter((r) => QUE_CAT.includes(r.iching.queChinh));
     }
 
+    // Filter by hung tinh (must contain selected hung tinh types)
+    if (filterHungTinh.length > 0) {
+      filtered = filtered.filter((r) => {
+        const analysis = analyzePhone(r.phoneNumber);
+        return filterHungTinh.some((ht) => analysis.hungTinhTypes.includes(ht));
+      });
+    }
+
     return filtered;
-  }, [results, filterCarrier, filterMenh, filterQueChinh]);
+  }, [results, filterCarrier, filterMenh, filterQueChinh, filterHungTinh]);
 
   const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
   const paginatedResults = filteredResults.slice(
@@ -109,10 +119,8 @@ export default function HomePage() {
       const allSelected = carrierPrefixes.every((p) => newSet.has(p));
       
       if (allSelected) {
-        // Deselect all
         carrierPrefixes.forEach((p) => newSet.delete(p));
       } else {
-        // Select all
         carrierPrefixes.forEach((p) => newSet.add(p));
       }
       return newSet;
@@ -128,10 +136,8 @@ export default function HomePage() {
         const current = [...newConds[activeSlot]];
 
         if (condName === "*") {
-          // Reset to wildcard
           newConds[activeSlot] = ["*"];
         } else {
-          // Remove * if present
           const withoutStar = current.filter((c) => c !== "*");
           const idx = withoutStar.indexOf(condName);
           if (idx >= 0) {
@@ -152,12 +158,11 @@ export default function HomePage() {
     setIsCalculating(true);
     setCurrentPage(1);
     setHasCalculated(true);
-    // Reset filters
     setFilterCarrier("all");
     setFilterMenh([]);
     setFilterQueChinh("all");
+    setFilterHungTinh([]);
 
-    // Use setTimeout to avoid blocking UI
     setTimeout(() => {
       try {
         const blacklist = getBlacklist();
@@ -173,13 +178,10 @@ export default function HomePage() {
     }, 50);
   }, [prefixes, conditions]);
 
-  const handleAddToBlacklist = useCallback(
-    (phone: string) => {
-      addToBlacklist([phone]);
-      setResults((prev) => prev.filter((r) => r.phoneNumber !== phone));
-    },
-    []
-  );
+  const handleAddToBlacklist = useCallback((phone: string) => {
+    addToBlacklist([phone]);
+    setResults((prev) => prev.filter((r) => r.phoneNumber !== phone));
+  }, []);
 
   const handleExportCSV = useCallback(() => {
     exportToCSV(filteredResults);
@@ -188,6 +190,13 @@ export default function HomePage() {
   const toggleMenhFilter = (menh: string) => {
     setFilterMenh((prev) =>
       prev.includes(menh) ? prev.filter((m) => m !== menh) : [...prev, menh]
+    );
+    setCurrentPage(1);
+  };
+
+  const toggleHungTinhFilter = (ht: string) => {
+    setFilterHungTinh((prev) =>
+      prev.includes(ht) ? prev.filter((h) => h !== ht) : [...prev, ht]
     );
     setCurrentPage(1);
   };
@@ -211,30 +220,30 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-6 px-4">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-4 sm:py-6 px-3 sm:px-4 pb-24">
       <div className="mx-auto max-w-5xl">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             LINH SỐ
           </h1>
-          <p className="text-slate-600 mt-2 text-lg">
+          <p className="text-slate-600 mt-1 sm:mt-2 text-sm sm:text-lg">
             Tìm Số Điện Thoại Phong Thủy
           </p>
         </div>
 
         {/* Carrier Selection */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <label className="block text-sm font-semibold text-slate-700 mb-3">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <label className="block text-sm font-semibold text-slate-700 mb-2 sm:mb-3">
             Chọn nhà mạng:
           </label>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
             {(["Tất cả", "Viettel", "Vinaphone", "Mobifone", "Custom"] as CarrierOption[]).map(
               (opt) => (
                 <button
                   key={opt}
                   onClick={() => setCarrierOption(opt)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
                     carrierOption === opt
                       ? "bg-blue-600 text-white shadow-md"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -248,31 +257,31 @@ export default function HomePage() {
 
           {/* Custom Prefix Selection */}
           {carrierOption === "Custom" && (
-            <div className="border-t pt-4 mt-2">
-              <p className="text-xs text-slate-500 mb-3">
-                Chọn các đầu số bạn muốn (đã chọn: <span className="font-bold text-blue-600">{selectedCustomPrefixes.size}</span> đầu số):
+            <div className="border-t pt-3 sm:pt-4 mt-2">
+              <p className="text-xs text-slate-500 mb-2 sm:mb-3">
+                Đã chọn: <span className="font-bold text-blue-600">{selectedCustomPrefixes.size}</span> đầu số
               </p>
               
               {/* Viettel */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold text-red-600 w-20">Viettel:</span>
+              <div className="mb-3 sm:mb-4">
+                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                  <span className="text-xs font-semibold text-red-600">Viettel:</span>
                   <button
                     onClick={() => selectAllPrefixesForCarrier("Viettel")}
-                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                    className="text-[10px] sm:text-xs text-blue-500 hover:text-blue-700 underline"
                   >
-                    {CARRIERS.Viettel.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    {CARRIERS.Viettel.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn" : "Chọn tất cả"}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 ml-[88px]">
+                <div className="flex flex-wrap gap-1 sm:gap-1.5">
                   {CARRIERS.Viettel.map((prefix) => (
                     <button
                       key={prefix}
                       onClick={() => toggleCustomPrefix(prefix)}
-                      className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+                      className={`px-2 py-1 rounded text-[11px] sm:text-xs font-mono font-medium transition-all ${
                         selectedCustomPrefixes.has(prefix)
                           ? "bg-red-500 text-white shadow-sm"
-                          : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                          : "bg-red-50 text-red-700 border border-red-200"
                       }`}
                     >
                       {prefix}
@@ -282,25 +291,25 @@ export default function HomePage() {
               </div>
 
               {/* Vinaphone */}
-              <div className="mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold text-blue-600 w-20">Vinaphone:</span>
+              <div className="mb-3 sm:mb-4">
+                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                  <span className="text-xs font-semibold text-blue-600">Vinaphone:</span>
                   <button
                     onClick={() => selectAllPrefixesForCarrier("Vinaphone")}
-                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                    className="text-[10px] sm:text-xs text-blue-500 hover:text-blue-700 underline"
                   >
-                    {CARRIERS.Vinaphone.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    {CARRIERS.Vinaphone.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn" : "Chọn tất cả"}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 ml-[88px]">
+                <div className="flex flex-wrap gap-1 sm:gap-1.5">
                   {CARRIERS.Vinaphone.map((prefix) => (
                     <button
                       key={prefix}
                       onClick={() => toggleCustomPrefix(prefix)}
-                      className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+                      className={`px-2 py-1 rounded text-[11px] sm:text-xs font-mono font-medium transition-all ${
                         selectedCustomPrefixes.has(prefix)
                           ? "bg-blue-500 text-white shadow-sm"
-                          : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                          : "bg-blue-50 text-blue-700 border border-blue-200"
                       }`}
                     >
                       {prefix}
@@ -311,24 +320,24 @@ export default function HomePage() {
 
               {/* Mobifone */}
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold text-green-600 w-20">Mobifone:</span>
+                <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+                  <span className="text-xs font-semibold text-green-600">Mobifone:</span>
                   <button
                     onClick={() => selectAllPrefixesForCarrier("Mobifone")}
-                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                    className="text-[10px] sm:text-xs text-blue-500 hover:text-blue-700 underline"
                   >
-                    {CARRIERS.Mobifone.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    {CARRIERS.Mobifone.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn" : "Chọn tất cả"}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 ml-[88px]">
+                <div className="flex flex-wrap gap-1 sm:gap-1.5">
                   {CARRIERS.Mobifone.map((prefix) => (
                     <button
                       key={prefix}
                       onClick={() => toggleCustomPrefix(prefix)}
-                      className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+                      className={`px-2 py-1 rounded text-[11px] sm:text-xs font-mono font-medium transition-all ${
                         selectedCustomPrefixes.has(prefix)
                           ? "bg-green-500 text-white shadow-sm"
-                          : "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                          : "bg-green-50 text-green-700 border border-green-200"
                       }`}
                     >
                       {prefix}
@@ -341,21 +350,21 @@ export default function HomePage() {
         </div>
 
         {/* Structure Input - 7 Slots */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <label className="block text-sm font-semibold text-slate-700 mb-4">
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+          <label className="block text-sm font-semibold text-slate-700 mb-3 sm:mb-4">
             Cấu trúc số:
           </label>
 
-          {/* Slots Row */}
-          <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-2">
-            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs font-bold whitespace-nowrap shrink-0">
+          {/* Slots Row - Scrollable on mobile */}
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-1 px-1">
+            <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-[10px] sm:text-xs font-bold whitespace-nowrap shrink-0">
               ĐẦU SỐ
             </div>
             {conditions.map((conds, idx) => (
               <button
                 key={idx}
                 onClick={() => setActiveSlot(activeSlot === idx ? null : idx)}
-                className={`min-w-[56px] px-2 py-2 rounded-lg border-2 text-xs font-semibold transition-all shrink-0 ${
+                className={`min-w-[44px] sm:min-w-[56px] px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg border-2 text-[10px] sm:text-xs font-semibold transition-all shrink-0 ${
                   getSlotStyle(conds)
                 } ${
                   activeSlot === idx
@@ -363,26 +372,25 @@ export default function HomePage() {
                     : ""
                 }`}
               >
-                <div className="text-[10px] text-slate-400 mb-0.5">Input {idx + 1}</div>
-                <div className="truncate max-w-[80px]">{getSlotLabel(conds)}</div>
+                <div className="text-[8px] sm:text-[10px] text-slate-400 mb-0.5">Input {idx + 1}</div>
+                <div className="truncate max-w-[50px] sm:max-w-[80px]">{getSlotLabel(conds)}</div>
               </button>
             ))}
           </div>
 
-          {/* Condition Buttons - only show if a slot is selected */}
+          {/* Condition Buttons */}
           {activeSlot !== null && (
-            <div className="border-t pt-4">
-              <p className="text-xs text-slate-500 mb-3">
-                Chọn điều kiện cho <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>
-                {" "}(click để thêm/bỏ):
+            <div className="border-t pt-3 sm:pt-4">
+              <p className="text-xs text-slate-500 mb-2 sm:mb-3">
+                Điều kiện <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>:
               </p>
 
               {/* Cát Tinh */}
-              <div className="mb-3">
-                <span className="text-xs text-green-600 font-semibold mr-2">
-                  Cát tinh:
+              <div className="mb-2 sm:mb-3">
+                <span className="text-[10px] sm:text-xs text-green-600 font-semibold mr-2">
+                  Cát:
                 </span>
-                <div className="inline-flex flex-wrap gap-2">
+                <div className="inline-flex flex-wrap gap-1 sm:gap-2">
                   {CAT_TINH.map((name) => {
                     const short = TU_TRUONG_SHORT[name];
                     const isActive = conditions[activeSlot].includes(name);
@@ -391,10 +399,10 @@ export default function HomePage() {
                         key={name}
                         onClick={() => handleConditionToggle(name)}
                         title={name}
-                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
                           isActive
                             ? "bg-green-500 text-white shadow-md"
-                            : "bg-green-50 text-green-700 border border-green-300 hover:bg-green-100"
+                            : "bg-green-50 text-green-700 border border-green-300"
                         }`}
                       >
                         {short}
@@ -405,11 +413,11 @@ export default function HomePage() {
               </div>
 
               {/* Hung Tinh */}
-              <div className="mb-3">
-                <span className="text-xs text-red-600 font-semibold mr-2">
-                  Hung tinh:
+              <div className="mb-2 sm:mb-3">
+                <span className="text-[10px] sm:text-xs text-red-600 font-semibold mr-2">
+                  Hung:
                 </span>
-                <div className="inline-flex flex-wrap gap-2">
+                <div className="inline-flex flex-wrap gap-1 sm:gap-2">
                   {HUNG_TINH.map((name) => {
                     const short = TU_TRUONG_SHORT[name];
                     const isActive = conditions[activeSlot].includes(name);
@@ -418,10 +426,10 @@ export default function HomePage() {
                         key={name}
                         onClick={() => handleConditionToggle(name)}
                         title={name}
-                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                        className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
                           isActive
                             ? "bg-red-500 text-white shadow-md"
-                            : "bg-red-50 text-red-700 border border-red-300 hover:bg-red-100"
+                            : "bg-red-50 text-red-700 border border-red-300"
                         }`}
                       >
                         {short}
@@ -432,29 +440,27 @@ export default function HomePage() {
               </div>
 
               {/* Wildcard */}
-              <div>
-                <button
-                  onClick={() => handleConditionToggle("*")}
-                  className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    conditions[activeSlot].length === 1 &&
-                    conditions[activeSlot][0] === "*"
-                      ? "bg-gray-500 text-white shadow-md"
-                      : "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
-                  }`}
-                >
-                  * (Tất cả)
-                </button>
-              </div>
+              <button
+                onClick={() => handleConditionToggle("*")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
+                  conditions[activeSlot].length === 1 &&
+                  conditions[activeSlot][0] === "*"
+                    ? "bg-gray-500 text-white shadow-md"
+                    : "bg-gray-100 text-gray-600 border border-gray-300"
+                }`}
+              >
+                * (Tất cả)
+              </button>
             </div>
           )}
         </div>
 
         {/* Calculate Button */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <button
             onClick={handleCalculate}
             disabled={isCalculating || prefixes.length === 0}
-            className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 sm:py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-base sm:text-lg rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isCalculating ? (
               <span className="flex items-center justify-center gap-2">
@@ -477,15 +483,15 @@ export default function HomePage() {
 
         {/* Results */}
         {hasCalculated && !isCalculating && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-slate-800">
-                KẾT QUẢ ({filteredResults.length.toLocaleString()} / {results.length.toLocaleString()} số)
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0 mb-3 sm:mb-4">
+              <h2 className="text-base sm:text-lg font-bold text-slate-800">
+                KẾT QUẢ ({filteredResults.length.toLocaleString()} / {results.length.toLocaleString()})
               </h2>
               {filteredResults.length > 0 && (
                 <button
                   onClick={handleExportCSV}
-                  className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 transition-colors"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-500 text-white rounded-lg text-xs sm:text-sm font-semibold hover:bg-emerald-600 transition-colors self-start sm:self-auto"
                 >
                   📥 Xuất CSV
                 </button>
@@ -494,109 +500,197 @@ export default function HomePage() {
 
             {/* Filters */}
             {results.length > 0 && (
-              <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Bộ lọc kết quả:</p>
+              <div className="bg-slate-50 rounded-lg sm:rounded-xl p-3 sm:p-4 mb-3 sm:mb-4 space-y-2 sm:space-y-3">
+                <p className="text-[10px] sm:text-xs font-semibold text-slate-600 uppercase tracking-wide">Bộ lọc:</p>
                 
                 {/* Filter by Carrier */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-500 w-24">Nhà mạng:</span>
-                  <button
-                    onClick={() => { setFilterCarrier("all"); setCurrentPage(1); }}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                      filterCarrier === "all"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    Tất cả
-                  </button>
-                  {["Viettel", "Vinaphone", "Mobifone"].map((carrier) => (
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="text-[10px] sm:text-xs text-slate-500 w-16 sm:w-24 shrink-0">Nhà mạng:</span>
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                     <button
-                      key={carrier}
-                      onClick={() => { setFilterCarrier(carrier); setCurrentPage(1); }}
-                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                        filterCarrier === carrier
+                      onClick={() => { setFilterCarrier("all"); setCurrentPage(1); }}
+                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                        filterCarrier === "all"
                           ? "bg-blue-600 text-white"
-                          : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                          : "bg-white border border-slate-300 text-slate-600"
                       }`}
                     >
-                      {carrier}
+                      Tất cả
                     </button>
-                  ))}
+                    {["Viettel", "Vinaphone", "Mobifone"].map((carrier) => (
+                      <button
+                        key={carrier}
+                        onClick={() => { setFilterCarrier(carrier); setCurrentPage(1); }}
+                        className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                          filterCarrier === carrier
+                            ? "bg-blue-600 text-white"
+                            : "bg-white border border-slate-300 text-slate-600"
+                        }`}
+                      >
+                        {carrier}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Filter by Menh */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-500 w-24">Mệnh:</span>
-                  {ALL_MENH.map((menh) => {
-                    const isActive = filterMenh.includes(menh);
-                    const menhColor = {
-                      "Kim": "bg-yellow-100 text-yellow-800 border-yellow-300",
-                      "Mộc": "bg-green-100 text-green-800 border-green-300",
-                      "Thủy": "bg-blue-100 text-blue-800 border-blue-300",
-                      "Hỏa": "bg-red-100 text-red-800 border-red-300",
-                      "Thổ": "bg-amber-100 text-amber-800 border-amber-300",
-                    }[menh];
-                    return (
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="text-[10px] sm:text-xs text-slate-500 w-16 sm:w-24 shrink-0">Mệnh:</span>
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
+                    {ALL_MENH.map((menh) => {
+                      const isActive = filterMenh.includes(menh);
+                      const menhColors: Record<string, string> = {
+                        "Kim": "bg-yellow-100 text-yellow-800 border-yellow-300",
+                        "Mộc": "bg-green-100 text-green-800 border-green-300",
+                        "Thủy": "bg-blue-100 text-blue-800 border-blue-300",
+                        "Hỏa": "bg-red-100 text-red-800 border-red-300",
+                        "Thổ": "bg-amber-100 text-amber-800 border-amber-300",
+                      };
+                      return (
+                        <button
+                          key={menh}
+                          onClick={() => toggleMenhFilter(menh)}
+                          className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all border ${
+                            isActive
+                              ? "ring-2 ring-blue-500 ring-offset-1 " + menhColors[menh]
+                              : "bg-white border-slate-300 text-slate-600"
+                          }`}
+                        >
+                          {menh}
+                        </button>
+                      );
+                    })}
+                    {filterMenh.length > 0 && (
                       <button
-                        key={menh}
-                        onClick={() => toggleMenhFilter(menh)}
-                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all border ${
-                          isActive
-                            ? "ring-2 ring-blue-500 ring-offset-1 " + menhColor
-                            : "bg-white border-slate-300 text-slate-600 hover:bg-slate-100"
-                        }`}
+                        onClick={() => { setFilterMenh([]); setCurrentPage(1); }}
+                        className="text-[10px] sm:text-xs text-red-500 underline"
                       >
-                        {menh}
+                        Xóa
                       </button>
-                    );
-                  })}
-                  {filterMenh.length > 0 && (
-                    <button
-                      onClick={() => { setFilterMenh([]); setCurrentPage(1); }}
-                      className="text-xs text-red-500 hover:text-red-700 underline"
-                    >
-                      Xóa lọc
-                    </button>
-                  )}
+                    )}
+                  </div>
+                </div>
+
+                {/* Filter by Hung Tinh */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="text-[10px] sm:text-xs text-slate-500 w-16 sm:w-24 shrink-0">Hung Tinh:</span>
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
+                    {HUNG_TINH.map((ht) => {
+                      const isActive = filterHungTinh.includes(ht);
+                      const short = TU_TRUONG_SHORT[ht];
+                      return (
+                        <button
+                          key={ht}
+                          onClick={() => toggleHungTinhFilter(ht)}
+                          title={ht}
+                          className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                            isActive
+                              ? "bg-red-500 text-white ring-2 ring-red-300"
+                              : "bg-white border border-slate-300 text-slate-600"
+                          }`}
+                        >
+                          {short}
+                        </button>
+                      );
+                    })}
+                    {filterHungTinh.length > 0 && (
+                      <button
+                        onClick={() => { setFilterHungTinh([]); setCurrentPage(1); }}
+                        className="text-[10px] sm:text-xs text-red-500 underline"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Filter by Que Chinh */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-500 w-24">Quẻ Chính:</span>
-                  <button
-                    onClick={() => { setFilterQueChinh("all"); setCurrentPage(1); }}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                      filterQueChinh === "all"
-                        ? "bg-blue-600 text-white"
-                        : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    Tất cả
-                  </button>
-                  <button
-                    onClick={() => { setFilterQueChinh("cat"); setCurrentPage(1); }}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                      filterQueChinh === "cat"
-                        ? "bg-green-600 text-white"
-                        : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    🍀 Quẻ Cát
-                  </button>
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <span className="text-[10px] sm:text-xs text-slate-500 w-16 sm:w-24 shrink-0">Quẻ Chính:</span>
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
+                    <button
+                      onClick={() => { setFilterQueChinh("all"); setCurrentPage(1); }}
+                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                        filterQueChinh === "all"
+                          ? "bg-blue-600 text-white"
+                          : "bg-white border border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      Tất cả
+                    </button>
+                    <button
+                      onClick={() => { setFilterQueChinh("cat"); setCurrentPage(1); }}
+                      className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all ${
+                        filterQueChinh === "cat"
+                          ? "bg-green-600 text-white"
+                          : "bg-white border border-slate-300 text-slate-600"
+                      }`}
+                    >
+                      🍀 Quẻ Cát
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {filteredResults.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">
+              <p className="text-slate-500 text-center py-6 sm:py-8 text-sm">
                 {results.length === 0 
-                  ? "Không tìm thấy số nào phù hợp với điều kiện."
-                  : "Không có số nào khớp với bộ lọc hiện tại."}
+                  ? "Không tìm thấy số nào phù hợp."
+                  : "Không có số nào khớp bộ lọc."}
               </p>
             ) : (
               <>
-                <div className="overflow-x-auto">
+                {/* Mobile Card View */}
+                <div className="sm:hidden space-y-2">
+                  {paginatedResults.map((r, i) => {
+                    const isQueCat = QUE_CAT.includes(r.iching.queChinh);
+                    return (
+                      <div
+                        key={r.phoneNumber}
+                        className="bg-slate-50 rounded-lg p-3 border border-slate-100"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-bold text-slate-800 text-base">
+                            {formatPhoneDisplay(r.phoneNumber)}
+                          </span>
+                          <button
+                            onClick={() => handleAddToBlacklist(r.phoneNumber)}
+                            className="text-red-400 hover:text-red-600 p-1"
+                          >
+                            🚫
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 text-[10px]">
+                          <span className={`font-semibold px-1.5 py-0.5 rounded-full ${
+                            r.carrier === "Viettel" ? "bg-red-100 text-red-700" :
+                            r.carrier === "Vinaphone" ? "bg-blue-100 text-blue-700" :
+                            "bg-green-100 text-green-700"
+                          }`}>
+                            {r.carrier}
+                          </span>
+                          <span className={`font-semibold px-1.5 py-0.5 rounded ${
+                            r.iching.menh === "Kim" ? "bg-yellow-100 text-yellow-800" :
+                            r.iching.menh === "Mộc" ? "bg-green-100 text-green-800" :
+                            r.iching.menh === "Thủy" ? "bg-blue-100 text-blue-800" :
+                            r.iching.menh === "Hỏa" ? "bg-red-100 text-red-800" :
+                            "bg-amber-100 text-amber-800"
+                          }`}>
+                            {r.iching.menh}
+                          </span>
+                        </div>
+                        <div className="mt-2 text-[10px] text-slate-600 space-y-0.5">
+                          <div><span className="text-slate-400">Q.Chính:</span> {isQueCat && "🍀"}{r.iching.queChinh}</div>
+                          <div><span className="text-slate-400">Q.Hỗ:</span> {r.iching.queHo}</div>
+                          <div><span className="text-slate-400">Q.Biến:</span> {r.iching.queBien}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden sm:block overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b-2 border-slate-200">
@@ -669,43 +763,47 @@ export default function HomePage() {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
+                  <div className="flex items-center justify-center gap-1 sm:gap-2 mt-4 pt-4 border-t">
                     <button
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className="px-3 py-1 rounded bg-slate-100 text-slate-600 text-sm disabled:opacity-40 hover:bg-slate-200"
+                      className="px-2 sm:px-3 py-1 rounded bg-slate-100 text-slate-600 text-xs sm:text-sm disabled:opacity-40"
                     >
                       ‹
                     </button>
-                    {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => {
+                    
+                    {/* Show fewer pages on mobile */}
+                    {Array.from({ length: Math.min(totalPages, window?.innerWidth < 640 ? 5 : 10) }, (_, i) => {
+                      const maxPages = typeof window !== 'undefined' && window.innerWidth < 640 ? 5 : 10;
                       let pageNum: number;
-                      if (totalPages <= 10) {
+                      if (totalPages <= maxPages) {
                         pageNum = i + 1;
-                      } else if (currentPage <= 5) {
+                      } else if (currentPage <= Math.floor(maxPages / 2)) {
                         pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 4) {
-                        pageNum = totalPages - 9 + i;
+                      } else if (currentPage >= totalPages - Math.floor(maxPages / 2)) {
+                        pageNum = totalPages - maxPages + 1 + i;
                       } else {
-                        pageNum = currentPage - 5 + i;
+                        pageNum = currentPage - Math.floor(maxPages / 2) + i;
                       }
                       return (
                         <button
                           key={pageNum}
                           onClick={() => setCurrentPage(pageNum)}
-                          className={`px-3 py-1 rounded text-sm ${
+                          className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${
                             currentPage === pageNum
                               ? "bg-blue-600 text-white"
-                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
                           {pageNum}
                         </button>
                       );
                     })}
+                    
                     <button
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      className="px-3 py-1 rounded bg-slate-100 text-slate-600 text-sm disabled:opacity-40 hover:bg-slate-200"
+                      className="px-2 sm:px-3 py-1 rounded bg-slate-100 text-slate-600 text-xs sm:text-sm disabled:opacity-40"
                     >
                       ›
                     </button>
@@ -720,7 +818,7 @@ export default function HomePage() {
         <div className="text-center">
           <Link
             href="/blacklist"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-xl shadow-md text-slate-700 font-semibold hover:shadow-lg transition-all"
+            className="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-white rounded-xl shadow-md text-slate-700 font-semibold hover:shadow-lg transition-all text-sm"
           >
             📋 Quản lý Black List
           </Link>

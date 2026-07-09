@@ -1,0 +1,24 @@
+{
+  "name": "Linh Số - Tìm Số Điện Thoại Phong Thủy",
+  "short_name": "Linh Số",
+  "description": "Phần mềm tìm kiếm số điện thoại phù hợp dựa trên quy tắc Từ Trường và Kinh Dịch",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
