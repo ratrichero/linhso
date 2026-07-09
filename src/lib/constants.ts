@@ -196,3 +196,42 @@ export function getCarrierName(phoneNumber: string): string {
   }
   return "Không xác định";
 }
+
+// Danh sách Quẻ Cát (Quẻ tốt lành)
+export const QUE_CAT: string[] = [
+  "Thuần Càn",           // Sức mạnh, thành công
+  "Thuần Khôn",          // Thuận lợi, bền vững
+  "Địa Thiên Thái",      // Thái hòa, hanh thông
+  "Thiên Hỏa Đồng Nhân", // Hòa hợp, đồng lòng
+  "Hỏa Thiên Đại Hữu",   // Giàu có, thịnh vượng
+  "Địa Sơn Khiêm",       // Khiêm tốn, được quý
+  "Lôi Địa Dự",          // Vui vẻ, hạnh phúc
+  "Phong Lôi Ích",       // Lợi ích, tăng trưởng
+  "Trạch Sơn Hàm",       // Cảm thông, tình duyên
+  "Lôi Phong Hằng",      // Bền vững, lâu dài
+  "Lôi Thiên Đại Tráng", // Mạnh mẽ, hùng tráng
+  "Hỏa Địa Tấn",         // Tiến bộ, thăng tiến
+  "Địa Trạch Lâm",       // Vận may đến
+  "Phong Địa Quan",      // Quan sát, hiểu biết
+  "Thuần Đoài",          // Vui vẻ, hài hòa
+  "Thủy Hỏa Ký Tế",      // Hoàn thành, viên mãn
+  "Phong Hỏa Gia Nhân",  // Gia đình hạnh phúc
+  "Sơn Thiên Đại Súc",   // Tích lũy, giàu có
+  "Địa Lôi Phục",        // Hồi phục, khởi đầu mới
+  "Phong Thiên Tiểu Súc",// Tiết kiệm, tích góp
+  "Thuần Ly",            // Sáng suốt, may mắn
+  "Thuần Tốn",           // Thuận lợi, nhẹ nhàng
+  "Thiên Phong Cấu",     // Gặp gỡ, cơ hội
+  "Trạch Thiên Quải",    // Quyết đoán, thành công
+  "Địa Phong Thăng",     // Thăng tiến, phát triển
+  "Trạch Thủy Khốn",     // Vượt khó (sau khó có may)
+  "Thủy Phong Tỉnh",     // Nguồn lực dồi dào
+  "Hỏa Phong Đỉnh",      // Đỉnh cao, thành tựu
+  "Phong Sơn Tiệm",      // Tiến dần, ổn định
+  "Lôi Trạch Quy Muội",  // Hôn nhân, kết hợp
+  "Lôi Hỏa Phong",       // Phong phú, dồi dào
+  "Phong Trạch Trung Phu",// Chân thành, tin cậy
+  "Sơn Hỏa Bí",          // Vẻ đẹp, trang trí
+  "Thủy Địa Tỷ",         // Thân thiện, hợp tác
+  "Thủy Thiên Nhu",      // Chờ đợi, kiên nhẫn được thưởng
+];

@@ -41,31 +41,35 @@ export function calculateIChing(phoneNumber: string): IChingResult {
   let haoDong = totalSum % 6;
   if (haoDong === 0) haoDong = 6;
 
-  // === QUẺ BIẾN ===
-  // Lấy binary 6 hào của Quẻ Chính: Thượng 3 hào + Hạ 3 hào
-  const originalSixLines = [...thuongQuai.binary, ...haQuai.binary];
-  const bienSixLines = [...originalSixLines];
+  // === SIX LINES (6 hào) ===
+  // QUAN TRỌNG: Hào đếm từ DƯỚI LÊN TRÊN (hào 1 -> hào 6)
+  // Nên HẠ QUÁI phải đứng TRƯỚC, THƯỢNG QUÁI đứng SAU
+  // Index 0,1,2 = Hạ Quái (hào 1,2,3)
+  // Index 3,4,5 = Thượng Quái (hào 4,5,6)
+  const originalSixLines = [...haQuai.binary, ...thuongQuai.binary];
 
-  // Lật hào động (0->1 hoặc 1->0)
+  // === QUẺ BIẾN ===
+  const bienSixLines = [...originalSixLines];
+  // Lật hào động (hào 1 = index 0, hào 6 = index 5)
   bienSixLines[haoDong - 1] = bienSixLines[haoDong - 1] === 0 ? 1 : 0;
 
-  // Tách lại thành Thượng + Hạ mới
-  const newThuongIdx = binaryToQuaiIndex(bienSixLines.slice(0, 3));
-  const newHaIdx = binaryToQuaiIndex(bienSixLines.slice(3, 6));
-  const newThuongName = BAT_QUAI[newThuongIdx].name;
+  // Tách lại: newHa = 3 phần tử ĐẦU (index 0,1,2), newThuong = 3 phần tử CUỐI (index 3,4,5)
+  const newHaIdx = binaryToQuaiIndex(bienSixLines.slice(0, 3));
+  const newThuongIdx = binaryToQuaiIndex(bienSixLines.slice(3, 6));
   const newHaName = BAT_QUAI[newHaIdx].name;
+  const newThuongName = BAT_QUAI[newThuongIdx].name;
   const queBienName = QUE_64[`${newThuongName}_${newHaName}`] || "Không xác định";
 
   // === QUẺ HỖ ===
-  // Lấy hào 2,3,4 (index 1,2,3) làm Hạ Quái Hỗ
-  // Lấy hào 3,4,5 (index 2,3,4) làm Thượng Quái Hỗ
-  const hoThuongBinary = [originalSixLines[2], originalSixLines[3], originalSixLines[4]];
+  // Hạ Quái Hỗ (Nội Hỗ) - Hào 2,3,4: index [1,2,3]
+  // Thượng Quái Hỗ (Ngoại Hỗ) - Hào 3,4,5: index [2,3,4]
   const hoHaBinary = [originalSixLines[1], originalSixLines[2], originalSixLines[3]];
+  const hoThuongBinary = [originalSixLines[2], originalSixLines[3], originalSixLines[4]];
 
-  const hoThuongIdx = binaryToQuaiIndex(hoThuongBinary);
   const hoHaIdx = binaryToQuaiIndex(hoHaBinary);
-  const hoThuongName = BAT_QUAI[hoThuongIdx].name;
+  const hoThuongIdx = binaryToQuaiIndex(hoThuongBinary);
   const hoHaName = BAT_QUAI[hoHaIdx].name;
+  const hoThuongName = BAT_QUAI[hoThuongIdx].name;
   const queHoName = QUE_64[`${hoThuongName}_${hoHaName}`] || "Không xác định";
 
   return {

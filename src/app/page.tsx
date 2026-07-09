@@ -7,7 +7,7 @@ import {
   CAT_TINH,
   HUNG_TINH,
   TU_TRUONG_SHORT,
-  SHORT_TO_FULL,
+  QUE_CAT,
 } from "@/lib/constants";
 import {
   generatePhoneNumbers,
@@ -17,10 +17,11 @@ import {
 import { getBlacklist, addToBlacklist } from "@/lib/blacklist";
 import { exportToCSV, formatPhoneDisplay } from "@/lib/exportCSV";
 
-const ALL_CONDITIONS = [...CAT_TINH, ...HUNG_TINH];
 const ITEMS_PER_PAGE = 50;
+const ALL_MENH = ["Kim", "Mộc", "Thủy", "Hỏa", "Thổ"];
 
 type CarrierOption = "Tất cả" | "Viettel" | "Vinaphone" | "Mobifone" | "Custom";
+type QueChinhFilter = "all" | "cat";
 
 export default function HomePage() {
   // --- State ---
@@ -34,6 +35,11 @@ export default function HomePage() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasCalculated, setHasCalculated] = useState(false);
+
+  // Filter state
+  const [filterCarrier, setFilterCarrier] = useState<string>("all");
+  const [filterMenh, setFilterMenh] = useState<string[]>([]);
+  const [filterQueChinh, setFilterQueChinh] = useState<QueChinhFilter>("all");
 
   // --- Derived ---
   const prefixes = useMemo(() => {
@@ -58,8 +64,30 @@ export default function HomePage() {
     }
   }, [carrierOption, customPrefixes]);
 
-  const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
-  const paginatedResults = results.slice(
+  // Apply filters to results
+  const filteredResults = useMemo(() => {
+    let filtered = results;
+
+    // Filter by carrier
+    if (filterCarrier !== "all") {
+      filtered = filtered.filter((r) => r.carrier === filterCarrier);
+    }
+
+    // Filter by menh (multiple selection)
+    if (filterMenh.length > 0) {
+      filtered = filtered.filter((r) => filterMenh.includes(r.iching.menh));
+    }
+
+    // Filter by que chinh (cat only)
+    if (filterQueChinh === "cat") {
+      filtered = filtered.filter((r) => QUE_CAT.includes(r.iching.queChinh));
+    }
+
+    return filtered;
+  }, [results, filterCarrier, filterMenh, filterQueChinh]);
+
+  const totalPages = Math.ceil(filteredResults.length / ITEMS_PER_PAGE);
+  const paginatedResults = filteredResults.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
@@ -98,6 +126,10 @@ export default function HomePage() {
     setIsCalculating(true);
     setCurrentPage(1);
     setHasCalculated(true);
+    // Reset filters
+    setFilterCarrier("all");
+    setFilterMenh([]);
+    setFilterQueChinh("all");
 
     // Use setTimeout to avoid blocking UI
     setTimeout(() => {
@@ -124,8 +156,15 @@ export default function HomePage() {
   );
 
   const handleExportCSV = useCallback(() => {
-    exportToCSV(results);
-  }, [results]);
+    exportToCSV(filteredResults);
+  }, [filteredResults]);
+
+  const toggleMenhFilter = (menh: string) => {
+    setFilterMenh((prev) =>
+      prev.includes(menh) ? prev.filter((m) => m !== menh) : [...prev, menh]
+    );
+    setCurrentPage(1);
+  };
 
   // --- Slot Color ---
   const getSlotStyle = (conds: string[]) => {
@@ -219,7 +258,7 @@ export default function HomePage() {
                     : ""
                 }`}
               >
-                <div className="text-[10px] text-slate-400 mb-0.5">Ô{idx + 1}</div>
+                <div className="text-[10px] text-slate-400 mb-0.5">Input {idx + 1}</div>
                 <div className="truncate max-w-[80px]">{getSlotLabel(conds)}</div>
               </button>
             ))}
@@ -229,7 +268,7 @@ export default function HomePage() {
           {activeSlot !== null && (
             <div className="border-t pt-4">
               <p className="text-xs text-slate-500 mb-3">
-                Chọn điều kiện cho <span className="font-bold text-blue-600">Ô {activeSlot + 1}</span>
+                Chọn điều kiện cho <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>
                 {" "}(click để thêm/bỏ):
               </p>
 
@@ -331,9 +370,9 @@ export default function HomePage() {
           <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-800">
-                KẾT QUẢ ({results.length.toLocaleString()} số)
+                KẾT QUẢ ({filteredResults.length.toLocaleString()} / {results.length.toLocaleString()} số)
               </h2>
-              {results.length > 0 && (
+              {filteredResults.length > 0 && (
                 <button
                   onClick={handleExportCSV}
                   className="px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 transition-colors"
@@ -343,9 +382,107 @@ export default function HomePage() {
               )}
             </div>
 
-            {results.length === 0 ? (
+            {/* Filters */}
+            {results.length > 0 && (
+              <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Bộ lọc kết quả:</p>
+                
+                {/* Filter by Carrier */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500 w-24">Nhà mạng:</span>
+                  <button
+                    onClick={() => { setFilterCarrier("all"); setCurrentPage(1); }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      filterCarrier === "all"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Tất cả
+                  </button>
+                  {["Viettel", "Vinaphone", "Mobifone"].map((carrier) => (
+                    <button
+                      key={carrier}
+                      onClick={() => { setFilterCarrier(carrier); setCurrentPage(1); }}
+                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                        filterCarrier === carrier
+                          ? "bg-blue-600 text-white"
+                          : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {carrier}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filter by Menh */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500 w-24">Mệnh:</span>
+                  {ALL_MENH.map((menh) => {
+                    const isActive = filterMenh.includes(menh);
+                    const menhColor = {
+                      "Kim": "bg-yellow-100 text-yellow-800 border-yellow-300",
+                      "Mộc": "bg-green-100 text-green-800 border-green-300",
+                      "Thủy": "bg-blue-100 text-blue-800 border-blue-300",
+                      "Hỏa": "bg-red-100 text-red-800 border-red-300",
+                      "Thổ": "bg-amber-100 text-amber-800 border-amber-300",
+                    }[menh];
+                    return (
+                      <button
+                        key={menh}
+                        onClick={() => toggleMenhFilter(menh)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all border ${
+                          isActive
+                            ? "ring-2 ring-blue-500 ring-offset-1 " + menhColor
+                            : "bg-white border-slate-300 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        {menh}
+                      </button>
+                    );
+                  })}
+                  {filterMenh.length > 0 && (
+                    <button
+                      onClick={() => { setFilterMenh([]); setCurrentPage(1); }}
+                      className="text-xs text-red-500 hover:text-red-700 underline"
+                    >
+                      Xóa lọc
+                    </button>
+                  )}
+                </div>
+
+                {/* Filter by Que Chinh */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500 w-24">Quẻ Chính:</span>
+                  <button
+                    onClick={() => { setFilterQueChinh("all"); setCurrentPage(1); }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      filterQueChinh === "all"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Tất cả
+                  </button>
+                  <button
+                    onClick={() => { setFilterQueChinh("cat"); setCurrentPage(1); }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      filterQueChinh === "cat"
+                        ? "bg-green-600 text-white"
+                        : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    🍀 Quẻ Cát
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {filteredResults.length === 0 ? (
               <p className="text-slate-500 text-center py-8">
-                Không tìm thấy số nào phù hợp với điều kiện.
+                {results.length === 0 
+                  ? "Không tìm thấy số nào phù hợp với điều kiện."
+                  : "Không có số nào khớp với bộ lọc hiện tại."}
               </p>
             ) : (
               <>
@@ -364,52 +501,58 @@ export default function HomePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedResults.map((r, i) => (
-                        <tr
-                          key={r.phoneNumber}
-                          className="border-b border-slate-100 hover:bg-slate-50"
-                        >
-                          <td className="py-2 px-2 text-slate-400 text-xs">
-                            {(currentPage - 1) * ITEMS_PER_PAGE + i + 1}
-                          </td>
-                          <td className="py-2 px-2">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                              r.carrier === "Viettel" ? "bg-red-100 text-red-700" :
-                              r.carrier === "Vinaphone" ? "bg-blue-100 text-blue-700" :
-                              r.carrier === "Mobifone" ? "bg-green-100 text-green-700" :
-                              "bg-gray-100 text-gray-700"
-                            }`}>
-                              {r.carrier}
-                            </span>
-                          </td>
-                          <td className="py-2 px-2 font-mono font-bold text-slate-800">
-                            {formatPhoneDisplay(r.phoneNumber)}
-                          </td>
-                          <td className="py-2 px-2">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                              r.iching.menh === "Kim" ? "bg-yellow-100 text-yellow-800" :
-                              r.iching.menh === "Mộc" ? "bg-green-100 text-green-800" :
-                              r.iching.menh === "Thủy" ? "bg-blue-100 text-blue-800" :
-                              r.iching.menh === "Hỏa" ? "bg-red-100 text-red-800" :
-                              "bg-amber-100 text-amber-800"
-                            }`}>
-                              {r.iching.menh}
-                            </span>
-                          </td>
-                          <td className="py-2 px-2 text-xs text-slate-600">{r.iching.queChinh}</td>
-                          <td className="py-2 px-2 text-xs text-slate-600">{r.iching.queHo}</td>
-                          <td className="py-2 px-2 text-xs text-slate-600">{r.iching.queBien}</td>
-                          <td className="py-2 px-2 text-center">
-                            <button
-                              onClick={() => handleAddToBlacklist(r.phoneNumber)}
-                              className="text-red-400 hover:text-red-600 transition-colors"
-                              title="Thêm vào Black List"
-                            >
-                              🚫
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                      {paginatedResults.map((r, i) => {
+                        const isQueCat = QUE_CAT.includes(r.iching.queChinh);
+                        return (
+                          <tr
+                            key={r.phoneNumber}
+                            className="border-b border-slate-100 hover:bg-slate-50"
+                          >
+                            <td className="py-2 px-2 text-slate-400 text-xs">
+                              {(currentPage - 1) * ITEMS_PER_PAGE + i + 1}
+                            </td>
+                            <td className="py-2 px-2">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                r.carrier === "Viettel" ? "bg-red-100 text-red-700" :
+                                r.carrier === "Vinaphone" ? "bg-blue-100 text-blue-700" :
+                                r.carrier === "Mobifone" ? "bg-green-100 text-green-700" :
+                                "bg-gray-100 text-gray-700"
+                              }`}>
+                                {r.carrier}
+                              </span>
+                            </td>
+                            <td className="py-2 px-2 font-mono font-bold text-slate-800">
+                              {formatPhoneDisplay(r.phoneNumber)}
+                            </td>
+                            <td className="py-2 px-2">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                                r.iching.menh === "Kim" ? "bg-yellow-100 text-yellow-800" :
+                                r.iching.menh === "Mộc" ? "bg-green-100 text-green-800" :
+                                r.iching.menh === "Thủy" ? "bg-blue-100 text-blue-800" :
+                                r.iching.menh === "Hỏa" ? "bg-red-100 text-red-800" :
+                                "bg-amber-100 text-amber-800"
+                              }`}>
+                                {r.iching.menh}
+                              </span>
+                            </td>
+                            <td className="py-2 px-2 text-xs text-slate-600">
+                              {isQueCat && <span className="mr-1">🍀</span>}
+                              {r.iching.queChinh}
+                            </td>
+                            <td className="py-2 px-2 text-xs text-slate-600">{r.iching.queHo}</td>
+                            <td className="py-2 px-2 text-xs text-slate-600">{r.iching.queBien}</td>
+                            <td className="py-2 px-2 text-center">
+                              <button
+                                onClick={() => handleAddToBlacklist(r.phoneNumber)}
+                                className="text-red-400 hover:text-red-600 transition-colors"
+                                title="Thêm vào Black List"
+                              >
+                                🚫
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
