@@ -26,7 +26,7 @@ type QueChinhFilter = "all" | "cat";
 export default function HomePage() {
   // --- State ---
   const [carrierOption, setCarrierOption] = useState<CarrierOption>("Tất cả");
-  const [customPrefixes, setCustomPrefixes] = useState("");
+  const [selectedCustomPrefixes, setSelectedCustomPrefixes] = useState<Set<string>>(new Set());
   const [conditions, setConditions] = useState<Condition[]>(
     Array.from({ length: 7 }, () => ["*"])
   );
@@ -51,10 +51,7 @@ export default function HomePage() {
       case "Mobifone":
         return CARRIERS.Mobifone;
       case "Custom":
-        return customPrefixes
-          .trim()
-          .split(/[\s,]+/)
-          .filter((p) => /^0\d{2}$/.test(p));
+        return Array.from(selectedCustomPrefixes);
       default:
         return [
           ...CARRIERS.Viettel,
@@ -62,7 +59,7 @@ export default function HomePage() {
           ...CARRIERS.Mobifone,
         ];
     }
-  }, [carrierOption, customPrefixes]);
+  }, [carrierOption, selectedCustomPrefixes]);
 
   // Apply filters to results
   const filteredResults = useMemo(() => {
@@ -93,6 +90,35 @@ export default function HomePage() {
   );
 
   // --- Handlers ---
+  const toggleCustomPrefix = (prefix: string) => {
+    setSelectedCustomPrefixes((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(prefix)) {
+        newSet.delete(prefix);
+      } else {
+        newSet.add(prefix);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllPrefixesForCarrier = (carrier: string) => {
+    setSelectedCustomPrefixes((prev) => {
+      const newSet = new Set(prev);
+      const carrierPrefixes = CARRIERS[carrier] || [];
+      const allSelected = carrierPrefixes.every((p) => newSet.has(p));
+      
+      if (allSelected) {
+        // Deselect all
+        carrierPrefixes.forEach((p) => newSet.delete(p));
+      } else {
+        // Select all
+        carrierPrefixes.forEach((p) => newSet.add(p));
+      }
+      return newSet;
+    });
+  };
+
   const handleConditionToggle = useCallback(
     (condName: string) => {
       if (activeSlot === null) return;
@@ -219,18 +245,97 @@ export default function HomePage() {
               )
             )}
           </div>
+
+          {/* Custom Prefix Selection */}
           {carrierOption === "Custom" && (
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">
-                Nhập đầu số (phân tách bằng dấu cách, VD: 091 093 098):
-              </label>
-              <input
-                type="text"
-                value={customPrefixes}
-                onChange={(e) => setCustomPrefixes(e.target.value)}
-                placeholder="091 093 098"
-                className="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="border-t pt-4 mt-2">
+              <p className="text-xs text-slate-500 mb-3">
+                Chọn các đầu số bạn muốn (đã chọn: <span className="font-bold text-blue-600">{selectedCustomPrefixes.size}</span> đầu số):
+              </p>
+              
+              {/* Viettel */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-red-600 w-20">Viettel:</span>
+                  <button
+                    onClick={() => selectAllPrefixesForCarrier("Viettel")}
+                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                  >
+                    {CARRIERS.Viettel.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 ml-[88px]">
+                  {CARRIERS.Viettel.map((prefix) => (
+                    <button
+                      key={prefix}
+                      onClick={() => toggleCustomPrefix(prefix)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+                        selectedCustomPrefixes.has(prefix)
+                          ? "bg-red-500 text-white shadow-sm"
+                          : "bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
+                      }`}
+                    >
+                      {prefix}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vinaphone */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-blue-600 w-20">Vinaphone:</span>
+                  <button
+                    onClick={() => selectAllPrefixesForCarrier("Vinaphone")}
+                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                  >
+                    {CARRIERS.Vinaphone.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 ml-[88px]">
+                  {CARRIERS.Vinaphone.map((prefix) => (
+                    <button
+                      key={prefix}
+                      onClick={() => toggleCustomPrefix(prefix)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+                        selectedCustomPrefixes.has(prefix)
+                          ? "bg-blue-500 text-white shadow-sm"
+                          : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                      }`}
+                    >
+                      {prefix}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobifone */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-green-600 w-20">Mobifone:</span>
+                  <button
+                    onClick={() => selectAllPrefixesForCarrier("Mobifone")}
+                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                  >
+                    {CARRIERS.Mobifone.every((p) => selectedCustomPrefixes.has(p)) ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 ml-[88px]">
+                  {CARRIERS.Mobifone.map((prefix) => (
+                    <button
+                      key={prefix}
+                      onClick={() => toggleCustomPrefix(prefix)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+                        selectedCustomPrefixes.has(prefix)
+                          ? "bg-green-500 text-white shadow-sm"
+                          : "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                      }`}
+                    >
+                      {prefix}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -363,6 +468,11 @@ export default function HomePage() {
               "🔍 TÍNH TOÁN"
             )}
           </button>
+          {carrierOption === "Custom" && prefixes.length === 0 && (
+            <p className="text-center text-xs text-red-500 mt-2">
+              Vui lòng chọn ít nhất 1 đầu số
+            </p>
+          )}
         </div>
 
         {/* Results */}

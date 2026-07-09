@@ -46,6 +46,51 @@ export function getLastDigit(prefix: string): number {
 }
 
 /**
+ * Đếm số lượng hung tinh trong đầu số (3 số đầu).
+ * VD: "098" -> bỏ 0 -> "98" -> cặp "98" là "Họa Hại" -> return 1
+ * VD: "097" -> bỏ 0 -> "97" -> cặp "97" là "Ngũ Quỷ" -> return 1
+ * VD: "091" -> bỏ 0 -> "91" -> cặp "91" là "Diên Niên Lớn" (cát) -> return 0
+ */
+export function countHungTinhInPrefix(prefix: string): number {
+  // Bỏ số 0 đầu
+  let cleaned = prefix.replace(/^0+/, "");
+  
+  if (cleaned.length < 2) return 0;
+
+  let hungCount = 0;
+  let lastEffective: number | null = null;
+
+  for (let i = 0; i < cleaned.length; i++) {
+    const digit = parseInt(cleaned[i]);
+
+    // Bỏ qua số 5 (không tạo cặp)
+    if (digit === 5) continue;
+
+    // Nếu chưa có lastEffective, set nó
+    if (lastEffective === null) {
+      lastEffective = digit;
+      continue;
+    }
+
+    // Nếu digit trùng lastEffective, không tạo cặp mới
+    if (digit === lastEffective) continue;
+
+    // Tạo cặp và check hung tinh
+    const pair = `${lastEffective}${digit}`;
+    const pairType = PAIR_MAP[pair];
+
+    if (pairType && HUNG_TINH.includes(pairType)) {
+      hungCount++;
+    }
+
+    // Cập nhật lastEffective
+    lastEffective = digit;
+  }
+
+  return hungCount;
+}
+
+/**
  * Sinh danh sách số điện thoại hợp lệ.
  */
 export function generatePhoneNumbers(
@@ -58,13 +103,19 @@ export function generatePhoneNumbers(
   for (const prefix of prefixes) {
     const lastEffective = getLastDigit(prefix);
     
+    // Đếm hung tinh trong đầu số (3 số đầu)
+    const prefixHungCount = countHungTinhInPrefix(prefix);
+    
+    // Nếu đầu số đã có > 2 hung tinh thì bỏ qua luôn
+    if (prefixHungCount > 2) continue;
+    
     generateRecursive(
       prefix,
       lastEffective,
       0,
       conditions,
       [],
-      0,
+      prefixHungCount, // Bắt đầu với số hung tinh từ prefix
       results,
       blacklistSet
     );
@@ -147,11 +198,12 @@ function generateRecursive(
         newHungCount = hungCount + 1;
       }
 
-      // PRUNING: Nếu > 2 hung tinh thì bỏ
+      // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ
       if (newHungCount > 2) {
         continue;
       }
 
+      // Hợp lệ! Đi tiếp
       generateRecursive(
         prefix,
         digit, // CẬP NHẬT lastEffective
