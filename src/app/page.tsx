@@ -524,107 +524,50 @@ export default function HomePage() {
 
         {/* Structure Input - 7 Slots */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <label className="block text-sm font-semibold text-slate-700">
-              Cấu trúc số (7 vị trí):
-            </label>
-            <span className="text-[11px] sm:text-xs text-slate-500">
-              Có thể <strong className="text-blue-600">gõ trực tiếp số (0-9)</strong> hoặc chọn từ trường (SK, TY...)
-            </span>
-          </div>
+          <label className="block text-sm font-semibold text-slate-700 mb-3 sm:mb-4">
+            Cấu trúc số:
+          </label>
 
-          {/* Slots Grid - 7 Inputs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 mb-4 sm:mb-6">
+          {/* Slots Row - Scrollable on mobile */}
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-1 px-1">
+            <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-[10px] sm:text-xs font-bold whitespace-nowrap shrink-0">
+              ĐẦU SỐ
+            </div>
             {conditions.map((conds, idx) => (
               <div
                 key={idx}
                 onClick={() => setActiveSlot(idx)}
-                className={`relative flex flex-col p-2 rounded-xl border-2 transition-all cursor-pointer ${
+                className={`min-w-[48px] sm:min-w-[60px] px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg border-2 text-[10px] sm:text-xs font-semibold transition-all shrink-0 cursor-pointer ${
                   getSlotStyle(conds)
                 } ${
                   activeSlot === idx
-                    ? "ring-2 ring-blue-500 ring-offset-1 border-blue-500 shadow-md scale-[1.02]"
-                    : "hover:border-blue-300"
+                    ? "ring-2 ring-blue-500 ring-offset-1 scale-105 border-blue-500"
+                    : ""
                 }`}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] sm:text-xs font-bold text-slate-500">
-                    Input {idx + 1}
-                  </span>
-                  {conds.some((c) => c !== "*") && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleInputChange(idx, "*");
-                      }}
-                      title="Reset về *"
-                      className="text-[10px] text-slate-400 hover:text-red-500 font-bold px-1"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-
+                <div className="text-[8px] sm:text-[10px] text-slate-400 mb-0.5 text-center">Input {idx + 1}</div>
                 <input
                   type="text"
                   value={slotInputs[idx]}
                   onFocus={() => setActiveSlot(idx)}
                   onChange={(e) => handleInputChange(idx, e.target.value)}
-                  placeholder="*"
-                  className="w-full px-1.5 py-1 bg-white rounded border border-slate-300 text-xs sm:text-sm font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-center shadow-inner"
+                  className="w-full text-center bg-transparent text-[10px] sm:text-xs font-mono font-bold focus:outline-none truncate max-w-[50px] sm:max-w-[80px]"
                 />
-
-                <div className="text-[9px] sm:text-[10px] text-slate-500 mt-1 truncate text-center font-medium">
-                  {getSlotLabel(conds)}
-                </div>
               </div>
             ))}
           </div>
 
-          {/* Quick Selection Buttons for Active Slot */}
+          {/* Condition Buttons */}
           {activeSlot !== null && (
-            <div className="border-t pt-3 sm:pt-4 bg-slate-50/70 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 p-4 sm:p-6 rounded-b-xl sm:rounded-b-2xl">
-              <div className="flex items-center justify-between mb-2 sm:mb-3">
-                <p className="text-xs text-slate-600 font-medium">
-                  Chọn nhanh cho <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>:
-                </p>
-                <button
-                  onClick={() => handleConditionToggle("*")}
-                  className="text-[11px] text-slate-500 hover:text-slate-800 underline"
-                >
-                  Đặt về * (Bất kỳ)
-                </button>
-              </div>
-
-              {/* Digits 0-9 */}
-              <div className="mb-3">
-                <span className="text-[10px] sm:text-xs text-blue-600 font-semibold mr-2 block sm:inline mb-1 sm:mb-0">
-                  Số cụ thể (0-9):
-                </span>
-                <div className="inline-flex flex-wrap gap-1 sm:gap-1.5">
-                  {["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => {
-                    const isActive = conditions[activeSlot].includes(digit);
-                    return (
-                      <button
-                        key={digit}
-                        onClick={() => handleConditionToggle(digit)}
-                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md text-xs sm:text-sm font-mono font-bold transition-all ${
-                          isActive
-                            ? "bg-blue-600 text-white shadow-md scale-105"
-                            : "bg-white text-slate-700 border border-slate-300 hover:bg-blue-50"
-                        }`}
-                      >
-                        {digit}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+            <div className="border-t pt-3 sm:pt-4">
+              <p className="text-xs text-slate-500 mb-2 sm:mb-3">
+                Điều kiện <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>:
+              </p>
 
               {/* Cát Tinh */}
               <div className="mb-2 sm:mb-3">
-                <span className="text-[10px] sm:text-xs text-green-600 font-semibold mr-2 block sm:inline mb-1 sm:mb-0">
-                  Cát Tinh:
+                <span className="text-[10px] sm:text-xs text-green-600 font-semibold mr-2">
+                  Cát:
                 </span>
                 <div className="inline-flex flex-wrap gap-1 sm:gap-2">
                   {CAT_TINH.map((name) => {
@@ -638,10 +581,10 @@ export default function HomePage() {
                         className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
                           isActive
                             ? "bg-green-500 text-white shadow-md"
-                            : "bg-white text-green-700 border border-green-300 hover:bg-green-50"
+                            : "bg-green-50 text-green-700 border border-green-300"
                         }`}
                       >
-                        {short} ({name})
+                        {short}
                       </button>
                     );
                   })}
@@ -650,8 +593,8 @@ export default function HomePage() {
 
               {/* Hung Tinh */}
               <div className="mb-2 sm:mb-3">
-                <span className="text-[10px] sm:text-xs text-red-600 font-semibold mr-2 block sm:inline mb-1 sm:mb-0">
-                  Hung Tinh:
+                <span className="text-[10px] sm:text-xs text-red-600 font-semibold mr-2">
+                  Hung:
                 </span>
                 <div className="inline-flex flex-wrap gap-1 sm:gap-2">
                   {HUNG_TINH.map((name) => {
@@ -665,15 +608,28 @@ export default function HomePage() {
                         className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
                           isActive
                             ? "bg-red-500 text-white shadow-md"
-                            : "bg-white text-red-700 border border-red-300 hover:bg-red-50"
+                            : "bg-red-50 text-red-700 border border-red-300"
                         }`}
                       >
-                        {short} ({name})
+                        {short}
                       </button>
                     );
                   })}
                 </div>
               </div>
+
+              {/* Wildcard */}
+              <button
+                onClick={() => handleConditionToggle("*")}
+                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
+                  conditions[activeSlot].length === 1 &&
+                  conditions[activeSlot][0] === "*"
+                    ? "bg-gray-500 text-white shadow-md"
+                    : "bg-gray-100 text-gray-600 border border-gray-300"
+                }`}
+              >
+                * (Tất cả)
+              </button>
             </div>
           )}
         </div>
