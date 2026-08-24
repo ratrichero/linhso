@@ -178,15 +178,15 @@ function generateRecursive(
 
   const condition = conditions[currentIndex];
 
-  // Thử các số từ 0 đến 9
-  for (let digit = 0; digit <= 9; digit++) {
+  // Thử các số từ 1 đến 9 (KHÔNG cho phép số 0 theo quy tắc ứng dụng)
+  for (let digit = 1; digit <= 9; digit++) {
     if (!matchesCondition(digit, lastEffective, condition)) {
       continue;
     }
 
-    // ─── TRƯỜNG HỢP 1: digit = 5, digit = 0, hoặc digit trùng lastEffective ───
+    // ─── TRƯỜNG HỢP 1: digit = 5 hoặc digit trùng lastEffective ───
     // Những số này không tạo cặp mới trong Bát Trạch
-    if (digit === 5 || digit === 0 || digit === lastEffective) {
+    if (digit === 5 || digit === lastEffective) {
       generateRecursive(
         prefix,
         lastEffective, // KHÔNG ĐỔI
@@ -209,7 +209,7 @@ function generateRecursive(
       newHungCount = hungCount + 1;
     }
 
-    // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ
+    // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ qua
     if (newHungCount > 2) {
       continue;
     }
