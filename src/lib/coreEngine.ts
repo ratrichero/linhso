@@ -134,6 +134,9 @@ function generateRecursive(
   results: PhoneResult[],
   blacklistSet: Set<string>
 ): void {
+  // Safe cap to prevent memory issues with huge search spaces
+  if (results.length >= 10000) return;
+
   // === BASE CASE: Đã sinh đủ 7 số ===
   if (currentIndex === 7) {
     const fullNumber = prefix + currentDigits.join("");
@@ -146,31 +149,17 @@ function generateRecursive(
   }
 
   const condition = conditions[currentIndex];
+  const isWildcard = condition.includes("*");
 
-  // Thử từng số từ 1 đến 9 (không bao giờ dùng số 0)
-  for (let digit = 1; digit <= 9; digit++) {
-    // ─── TRƯỜNG HỢP 1: digit = 5 ───
-    if (digit === 5) {
-      // Số 5 không tạo cặp, chỉ hợp lệ nếu ô có *
-      if (condition.includes("*")) {
-        generateRecursive(
-          prefix,
-          lastEffective, // KHÔNG ĐỔI
-          currentIndex + 1,
-          conditions,
-          [...currentDigits, 5],
-          hungCount, // KHÔNG ĐỔI
-          results,
-          blacklistSet
-        );
-      }
-      continue;
-    }
+  // Thử các số từ 0 đến 9
+  for (let digit = 0; digit <= 9; digit++) {
+    const digitStr = digit.toString();
+    const isExactDigitMatch = condition.includes(digitStr);
 
-    // ─── TRƯỜNG HỢP 2: digit trùng lastEffective ───
-    if (digit === lastEffective) {
-      // Số trùng không tạo cặp, chỉ hợp lệ nếu ô có *
-      if (condition.includes("*")) {
+    // ─── TRƯỜNG HỢP 1: digit = 5, digit = 0, hoặc digit trùng lastEffective ───
+    // Những số này không tạo cặp mới trong Bát Trạch
+    if (digit === 5 || digit === 0 || digit === lastEffective) {
+      if (isWildcard || isExactDigitMatch) {
         generateRecursive(
           prefix,
           lastEffective, // KHÔNG ĐỔI
@@ -185,16 +174,15 @@ function generateRecursive(
       continue;
     }
 
-    // ─── TRƯỜNG HỢP 3: digit tạo cặp bình thường ───
+    // ─── TRƯỜNG HỢP 2: digit tạo cặp bình thường ───
     const pair = `${lastEffective}${digit}`;
     const pairType = PAIR_MAP[pair];
 
-    if (!pairType) continue; // pair not recognized
+    const isTuTruongMatch = pairType ? condition.includes(pairType) : false;
 
-    // Kiểm tra: cặp này có khớp điều kiện ô không?
-    if (condition.includes("*") || condition.includes(pairType)) {
+    if (isWildcard || isExactDigitMatch || isTuTruongMatch) {
       let newHungCount = hungCount;
-      if (HUNG_TINH.includes(pairType)) {
+      if (pairType && HUNG_TINH.includes(pairType)) {
         newHungCount = hungCount + 1;
       }
 
@@ -203,7 +191,6 @@ function generateRecursive(
         continue;
       }
 
-      // Hợp lệ! Đi tiếp
       generateRecursive(
         prefix,
         digit, // CẬP NHẬT lastEffective

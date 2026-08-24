@@ -7,6 +7,8 @@ import {
   CAT_TINH,
   HUNG_TINH,
   TU_TRUONG_SHORT,
+  SHORT_TO_FULL,
+  TU_TRUONG,
   QUE_CAT,
   getCarrierName,
 } from "@/lib/constants";
@@ -27,12 +29,68 @@ type CarrierOption = "Tất cả" | "Viettel" | "Vinaphone" | "Mobifone" | "Cust
 type QueChinhFilter = "all" | "cat";
 type ResultMode = "generate" | "lookup";
 
+function parseSlotInput(text: string): Condition {
+  if (!text || text.trim() === "") return ["*"];
+
+  const rawTokens = text
+    .split(/[,|\s+]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (rawTokens.length === 0) return ["*"];
+
+  const result: string[] = [];
+
+  for (const token of rawTokens) {
+    if (token === "*") {
+      result.push("*");
+      continue;
+    }
+
+    const upper = token.toUpperCase();
+    if (SHORT_TO_FULL[upper]) {
+      result.push(SHORT_TO_FULL[upper]);
+      continue;
+    }
+
+    const matchedTuTruong = Object.keys(TU_TRUONG).find(
+      (name) => name.toLowerCase() === token.toLowerCase()
+    );
+    if (matchedTuTruong) {
+      result.push(matchedTuTruong);
+      continue;
+    }
+
+    if (/^[0-9]+$/.test(token)) {
+      const digits = token.split("");
+      for (const d of digits) {
+        if (!result.includes(d)) {
+          result.push(d);
+        }
+      }
+      continue;
+    }
+
+    result.push(token);
+  }
+
+  return result.length > 0 ? result : ["*"];
+}
+
+function formatConditionToText(conds: Condition): string {
+  if (conds.length === 1 && conds[0] === "*") return "*";
+  return conds.map((c) => TU_TRUONG_SHORT[c] || c).join(", ");
+}
+
 export default function HomePage() {
   // --- State ---
   const [carrierOption, setCarrierOption] = useState<CarrierOption>("Tất cả");
   const [selectedCustomPrefixes, setSelectedCustomPrefixes] = useState<Set<string>>(new Set());
   const [conditions, setConditions] = useState<Condition[]>(
     Array.from({ length: 7 }, () => ["*"])
+  );
+  const [slotInputs, setSlotInputs] = useState<string[]>(
+    Array.from({ length: 7 }, () => "*")
   );
   const [activeSlot, setActiveSlot] = useState<number | null>(null);
   const [results, setResults] = useState<PhoneResult[]>([]);
@@ -161,6 +219,21 @@ export default function HomePage() {
     });
   };
 
+  const handleInputChange = (idx: number, val: string) => {
+    setSlotInputs((prev) => {
+      const next = [...prev];
+      next[idx] = val;
+      return next;
+    });
+
+    const parsed = parseSlotInput(val);
+    setConditions((prev) => {
+      const next = [...prev];
+      next[idx] = parsed;
+      return next;
+    });
+  };
+
   const handleConditionToggle = useCallback(
     (condName: string) => {
       if (activeSlot === null) return;
@@ -168,20 +241,29 @@ export default function HomePage() {
       setConditions((prev) => {
         const newConds = [...prev];
         const current = [...newConds[activeSlot]];
+        let updated: string[];
 
         if (condName === "*") {
-          newConds[activeSlot] = ["*"];
+          updated = ["*"];
         } else {
           const withoutStar = current.filter((c) => c !== "*");
           const idx = withoutStar.indexOf(condName);
           if (idx >= 0) {
             withoutStar.splice(idx, 1);
-            newConds[activeSlot] = withoutStar.length === 0 ? ["*"] : withoutStar;
+            updated = withoutStar.length === 0 ? ["*"] : withoutStar;
           } else {
             withoutStar.push(condName);
-            newConds[activeSlot] = withoutStar;
+            updated = withoutStar;
           }
         }
+        newConds[activeSlot] = updated;
+
+        setSlotInputs((prevInputs) => {
+          const nextInputs = [...prevInputs];
+          nextInputs[activeSlot] = formatConditionToText(updated);
+          return nextInputs;
+        });
+
         return newConds;
       });
     },
@@ -293,14 +375,16 @@ export default function HomePage() {
   // --- Slot Color ---
   const getSlotStyle = (conds: string[]) => {
     if (conds.length === 1 && conds[0] === "*") {
-      return "bg-gray-100 border-gray-300 text-gray-500";
+      return "bg-slate-50 border-slate-300 text-slate-500";
     }
     const hasCat = conds.some((c) => CAT_TINH.includes(c));
     const hasHung = conds.some((c) => HUNG_TINH.includes(c));
-    if (hasCat && hasHung) return "bg-yellow-100 border-yellow-400 text-yellow-800";
-    if (hasCat) return "bg-green-100 border-green-400 text-green-800";
-    if (hasHung) return "bg-red-100 border-red-400 text-red-800";
-    return "bg-gray-100 border-gray-300 text-gray-500";
+    const hasDigit = conds.some((c) => /^[0-9]$/.test(c));
+    if (hasCat && hasHung) return "bg-yellow-50 border-yellow-400 text-yellow-800";
+    if (hasCat) return "bg-green-50 border-green-400 text-green-800";
+    if (hasHung) return "bg-red-50 border-red-400 text-red-800";
+    if (hasDigit) return "bg-blue-50 border-blue-400 text-blue-800";
+    return "bg-slate-50 border-slate-300 text-slate-700";
   };
 
   const getSlotLabel = (conds: string[]) => {
@@ -440,44 +524,107 @@ export default function HomePage() {
 
         {/* Structure Input - 7 Slots */}
         <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
-          <label className="block text-sm font-semibold text-slate-700 mb-3 sm:mb-4">
-            Cấu trúc số:
-          </label>
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <label className="block text-sm font-semibold text-slate-700">
+              Cấu trúc số (7 vị trí):
+            </label>
+            <span className="text-[11px] sm:text-xs text-slate-500">
+              Có thể <strong className="text-blue-600">gõ trực tiếp số (0-9)</strong> hoặc chọn từ trường (SK, TY...)
+            </span>
+          </div>
 
-          {/* Slots Row - Scrollable on mobile */}
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-1 px-1">
-            <div className="px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-[10px] sm:text-xs font-bold whitespace-nowrap shrink-0">
-              ĐẦU SỐ
-            </div>
+          {/* Slots Grid - 7 Inputs */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 mb-4 sm:mb-6">
             {conditions.map((conds, idx) => (
-              <button
+              <div
                 key={idx}
-                onClick={() => setActiveSlot(activeSlot === idx ? null : idx)}
-                className={`min-w-[44px] sm:min-w-[56px] px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg border-2 text-[10px] sm:text-xs font-semibold transition-all shrink-0 ${
+                onClick={() => setActiveSlot(idx)}
+                className={`relative flex flex-col p-2 rounded-xl border-2 transition-all cursor-pointer ${
                   getSlotStyle(conds)
                 } ${
                   activeSlot === idx
-                    ? "ring-2 ring-blue-500 ring-offset-1 scale-105"
-                    : ""
+                    ? "ring-2 ring-blue-500 ring-offset-1 border-blue-500 shadow-md scale-[1.02]"
+                    : "hover:border-blue-300"
                 }`}
               >
-                <div className="text-[8px] sm:text-[10px] text-slate-400 mb-0.5">Input {idx + 1}</div>
-                <div className="truncate max-w-[50px] sm:max-w-[80px]">{getSlotLabel(conds)}</div>
-              </button>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] sm:text-xs font-bold text-slate-500">
+                    Input {idx + 1}
+                  </span>
+                  {conds.some((c) => c !== "*") && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleInputChange(idx, "*");
+                      }}
+                      title="Reset về *"
+                      className="text-[10px] text-slate-400 hover:text-red-500 font-bold px-1"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  value={slotInputs[idx]}
+                  onFocus={() => setActiveSlot(idx)}
+                  onChange={(e) => handleInputChange(idx, e.target.value)}
+                  placeholder="*"
+                  className="w-full px-1.5 py-1 bg-white rounded border border-slate-300 text-xs sm:text-sm font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-center shadow-inner"
+                />
+
+                <div className="text-[9px] sm:text-[10px] text-slate-500 mt-1 truncate text-center font-medium">
+                  {getSlotLabel(conds)}
+                </div>
+              </div>
             ))}
           </div>
 
-          {/* Condition Buttons */}
+          {/* Quick Selection Buttons for Active Slot */}
           {activeSlot !== null && (
-            <div className="border-t pt-3 sm:pt-4">
-              <p className="text-xs text-slate-500 mb-2 sm:mb-3">
-                Điều kiện <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>:
-              </p>
+            <div className="border-t pt-3 sm:pt-4 bg-slate-50/70 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 p-4 sm:p-6 rounded-b-xl sm:rounded-b-2xl">
+              <div className="flex items-center justify-between mb-2 sm:mb-3">
+                <p className="text-xs text-slate-600 font-medium">
+                  Chọn nhanh cho <span className="font-bold text-blue-600">Input {activeSlot + 1}</span>:
+                </p>
+                <button
+                  onClick={() => handleConditionToggle("*")}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 underline"
+                >
+                  Đặt về * (Bất kỳ)
+                </button>
+              </div>
+
+              {/* Digits 0-9 */}
+              <div className="mb-3">
+                <span className="text-[10px] sm:text-xs text-blue-600 font-semibold mr-2 block sm:inline mb-1 sm:mb-0">
+                  Số cụ thể (0-9):
+                </span>
+                <div className="inline-flex flex-wrap gap-1 sm:gap-1.5">
+                  {["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].map((digit) => {
+                    const isActive = conditions[activeSlot].includes(digit);
+                    return (
+                      <button
+                        key={digit}
+                        onClick={() => handleConditionToggle(digit)}
+                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-md text-xs sm:text-sm font-mono font-bold transition-all ${
+                          isActive
+                            ? "bg-blue-600 text-white shadow-md scale-105"
+                            : "bg-white text-slate-700 border border-slate-300 hover:bg-blue-50"
+                        }`}
+                      >
+                        {digit}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               {/* Cát Tinh */}
               <div className="mb-2 sm:mb-3">
-                <span className="text-[10px] sm:text-xs text-green-600 font-semibold mr-2">
-                  Cát:
+                <span className="text-[10px] sm:text-xs text-green-600 font-semibold mr-2 block sm:inline mb-1 sm:mb-0">
+                  Cát Tinh:
                 </span>
                 <div className="inline-flex flex-wrap gap-1 sm:gap-2">
                   {CAT_TINH.map((name) => {
@@ -491,10 +638,10 @@ export default function HomePage() {
                         className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
                           isActive
                             ? "bg-green-500 text-white shadow-md"
-                            : "bg-green-50 text-green-700 border border-green-300"
+                            : "bg-white text-green-700 border border-green-300 hover:bg-green-50"
                         }`}
                       >
-                        {short}
+                        {short} ({name})
                       </button>
                     );
                   })}
@@ -503,8 +650,8 @@ export default function HomePage() {
 
               {/* Hung Tinh */}
               <div className="mb-2 sm:mb-3">
-                <span className="text-[10px] sm:text-xs text-red-600 font-semibold mr-2">
-                  Hung:
+                <span className="text-[10px] sm:text-xs text-red-600 font-semibold mr-2 block sm:inline mb-1 sm:mb-0">
+                  Hung Tinh:
                 </span>
                 <div className="inline-flex flex-wrap gap-1 sm:gap-2">
                   {HUNG_TINH.map((name) => {
@@ -518,28 +665,15 @@ export default function HomePage() {
                         className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
                           isActive
                             ? "bg-red-500 text-white shadow-md"
-                            : "bg-red-50 text-red-700 border border-red-300"
+                            : "bg-white text-red-700 border border-red-300 hover:bg-red-50"
                         }`}
                       >
-                        {short}
+                        {short} ({name})
                       </button>
                     );
                   })}
                 </div>
               </div>
-
-              {/* Wildcard */}
-              <button
-                onClick={() => handleConditionToggle("*")}
-                className={`px-3 sm:px-4 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-semibold transition-all ${
-                  conditions[activeSlot].length === 1 &&
-                  conditions[activeSlot][0] === "*"
-                    ? "bg-gray-500 text-white shadow-md"
-                    : "bg-gray-100 text-gray-600 border border-gray-300"
-                }`}
-              >
-                * (Tất cả)
-              </button>
             </div>
           )}
         </div>
