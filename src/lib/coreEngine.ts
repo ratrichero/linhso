@@ -209,11 +209,6 @@ function generateRecursive(
       newHungCount = hungCount + 1;
     }
 
-    // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ qua
-    if (newHungCount > 2) {
-      continue;
-    }
-
     generateRecursive(
       prefix,
       digit, // CẬP NHẬT lastEffective
@@ -225,4 +220,45 @@ function generateRecursive(
       blacklistSet
     );
   }
+}
+
+export interface FlexibleSearchOptions {
+  prefixes: string[];
+  containsClusters: string[]; // e.g. ["26", "267"]
+  tailCatFilters: string[]; // e.g. ["Sinh Khí", "Thiên Y", "Diên Niên Nhỏ"]
+  blacklistSet: Set<string>;
+}
+
+/**
+ * Sinh danh sách số điện thoại theo cụm số linh hoạt và đuôi Cát tinh.
+ */
+export function generateFlexiblePhoneNumbers(
+  options: FlexibleSearchOptions
+): PhoneResult[] {
+  const { prefixes, containsClusters, tailCatFilters, blacklistSet } = options;
+
+  const tailCond = tailCatFilters.length > 0 ? tailCatFilters : ["*"];
+  const conditions: Condition[] = [
+    ["*"],
+    ["*"],
+    ["*"],
+    ["*"],
+    ["*"],
+    tailCond,
+    tailCond,
+  ];
+
+  const allNumbers = generatePhoneNumbers(prefixes, conditions, blacklistSet);
+
+  const cleanClusters = containsClusters
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  if (cleanClusters.length === 0) {
+    return allNumbers;
+  }
+
+  return allNumbers.filter((r) =>
+    cleanClusters.some((cluster) => r.phoneNumber.includes(cluster))
+  );
 }
