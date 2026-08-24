@@ -124,6 +124,34 @@ export function generatePhoneNumbers(
   return results;
 }
 
+function matchesCondition(
+  digit: number,
+  lastEffective: number,
+  condition: Condition
+): boolean {
+  if (condition.includes("*")) return true;
+
+  const digitStr = digit.toString();
+  const pairStr = `${lastEffective}${digit}`;
+  const pairType = PAIR_MAP[pairStr];
+
+  for (const token of condition) {
+    // 1. Single digit match (e.g. "8", "4", "0", "5")
+    if (token === digitStr) return true;
+
+    // 2. Exact 2-digit pair match (e.g. "64", "26", "42", "86", "65", "52")
+    if (token === pairStr) return true;
+
+    // 3. Tu Truong match (e.g. "Sinh Khí", "Thiên Y", "Diên Niên Nhỏ", etc.)
+    // Note: 0, 5, and repeating digits do not form a new Tu Truong pair in Bat Trach
+    if (digit !== 0 && digit !== 5 && digit !== lastEffective) {
+      if (pairType && token === pairType) return true;
+    }
+  }
+
+  return false;
+}
+
 function generateRecursive(
   prefix: string,
   lastEffective: number,
@@ -149,58 +177,52 @@ function generateRecursive(
   }
 
   const condition = conditions[currentIndex];
-  const isWildcard = condition.includes("*");
 
   // Thử các số từ 0 đến 9
   for (let digit = 0; digit <= 9; digit++) {
-    const digitStr = digit.toString();
-    const isExactDigitMatch = condition.includes(digitStr);
+    if (!matchesCondition(digit, lastEffective, condition)) {
+      continue;
+    }
 
     // ─── TRƯỜNG HỢP 1: digit = 5, digit = 0, hoặc digit trùng lastEffective ───
     // Những số này không tạo cặp mới trong Bát Trạch
     if (digit === 5 || digit === 0 || digit === lastEffective) {
-      if (isWildcard || isExactDigitMatch) {
-        generateRecursive(
-          prefix,
-          lastEffective, // KHÔNG ĐỔI
-          currentIndex + 1,
-          conditions,
-          [...currentDigits, digit],
-          hungCount, // KHÔNG ĐỔI
-          results,
-          blacklistSet
-        );
-      }
-      continue;
-    }
-
-    // ─── TRƯỜNG HỢP 2: digit tạo cặp bình thường ───
-    const pair = `${lastEffective}${digit}`;
-    const pairType = PAIR_MAP[pair];
-
-    const isTuTruongMatch = pairType ? condition.includes(pairType) : false;
-
-    if (isWildcard || isExactDigitMatch || isTuTruongMatch) {
-      let newHungCount = hungCount;
-      if (pairType && HUNG_TINH.includes(pairType)) {
-        newHungCount = hungCount + 1;
-      }
-
-      // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ
-      if (newHungCount > 2) {
-        continue;
-      }
-
       generateRecursive(
         prefix,
-        digit, // CẬP NHẬT lastEffective
+        lastEffective, // KHÔNG ĐỔI
         currentIndex + 1,
         conditions,
         [...currentDigits, digit],
-        newHungCount,
+        hungCount, // KHÔNG ĐỔI
         results,
         blacklistSet
       );
+      continue;
     }
+
+    // ─── TRƯỜNG HỢP 2: digit tạo cặp từ trường bình thường ───
+    const pair = `${lastEffective}${digit}`;
+    const pairType = PAIR_MAP[pair];
+
+    let newHungCount = hungCount;
+    if (pairType && HUNG_TINH.includes(pairType)) {
+      newHungCount = hungCount + 1;
+    }
+
+    // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ
+    if (newHungCount > 2) {
+      continue;
+    }
+
+    generateRecursive(
+      prefix,
+      digit, // CẬP NHẬT lastEffective
+      currentIndex + 1,
+      conditions,
+      [...currentDigits, digit],
+      newHungCount,
+      results,
+      blacklistSet
+    );
   }
 }

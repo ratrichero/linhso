@@ -32,7 +32,10 @@ type ResultMode = "generate" | "lookup";
 function parseSlotInput(text: string): Condition {
   if (!text || text.trim() === "") return ["*"];
 
-  const rawTokens = text
+  // Strip optional label like "ip1=", "ip1 = ", "slot1=", etc.
+  const cleaned = text.replace(/^(ip\d*|slot\d*)\s*=\s*/i, "");
+
+  const rawTokens = cleaned
     .split(/[,|\s+]+/)
     .map((s) => s.trim())
     .filter(Boolean);
@@ -61,12 +64,10 @@ function parseSlotInput(text: string): Condition {
       continue;
     }
 
-    if (/^[0-9]+$/.test(token)) {
-      const digits = token.split("");
-      for (const d of digits) {
-        if (!result.includes(d)) {
-          result.push(d);
-        }
+    // 1-digit or 2-digit number (e.g. "8", "64", "26", "42", "86")
+    if (/^[0-9]{1,2}$/.test(token)) {
+      if (!result.includes(token)) {
+        result.push(token);
       }
       continue;
     }
