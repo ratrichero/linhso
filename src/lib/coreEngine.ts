@@ -106,6 +106,9 @@ export function generatePhoneNumbers(
     // Đếm hung tinh trong đầu số (3 số đầu)
     const prefixHungCount = countHungTinhInPrefix(prefix);
     
+    // Nếu đầu số đã có > 2 hung tinh thì bỏ qua luôn
+    if (prefixHungCount > 2) continue;
+    
     generateRecursive(
       prefix,
       lastEffective,
@@ -204,6 +207,11 @@ function generateRecursive(
     let newHungCount = hungCount;
     if (pairType && HUNG_TINH.includes(pairType)) {
       newHungCount = hungCount + 1;
+    }
+
+    // PRUNING: Nếu > 2 hung tinh (bao gồm cả prefix) thì bỏ
+    if (newHungCount > 2) {
+      continue;
     }
 
     generateRecursive(
